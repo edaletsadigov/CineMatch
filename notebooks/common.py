@@ -12,3 +12,4 @@ import numpy as np
 # Database utilities
 from sqlalchemy import text, create_engine, URL
 from dotenv import load_dotenv
+import requests

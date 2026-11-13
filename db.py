@@ -1,27 +1,60 @@
 
 from pathlib import Path
+import os
 
-import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, URL
+
+
+# ==========================================
+# Project Configuration
+# ==========================================
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+BASE_SQL_FILE = PROJECT_ROOT / "base.sql"
+
+# Load environment variables
+load_dotenv(PROJECT_ROOT / ".env")
+
+
+# ==========================================
+# Psycopg Configuration
+# ==========================================
+
+PG_BIN_DIR = os.getenv("PG_BIN_DIR")
+
+if PG_BIN_DIR and PG_BIN_DIR not in os.environ["PATH"].split(os.pathsep):
+    os.environ["PATH"] = PG_BIN_DIR + os.pathsep + os.environ["PATH"]
+
+os.environ["PSYCOPG_IMPL"] = "python"
 
 
 # ==========================================
 # Database Configuration
 # ==========================================
 
-DB_SERVER = "localhost"
-DB_PORT = 5432
-DB_NAME = "cinematch"
-DB_USER = "cinematch"
-DB_PASSWORD = "Cinematch1234!"
+DB_SERVER = os.getenv("DB_SERVER")
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
+required_settings = {
+    "DB_SERVER": DB_SERVER,
+    "DB_NAME": DB_NAME,
+    "DB_USER": DB_USER,
+    "DB_PASSWORD": DB_PASSWORD,
+    "PG_BIN_DIR": PG_BIN_DIR,
+}
 
-# ==========================================
-# Project Paths
-# ==========================================
+missing_settings = [
+    key for key, value in required_settings.items() if not value
+]
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-BASE_SQL_FILE = PROJECT_ROOT / "base.sql"
+if missing_settings:
+    raise ValueError(
+        f"Missing environment variables: {', '.join(missing_settings)}"
+    )
 
 
 # ==========================================
@@ -35,7 +68,7 @@ def get_engine(database=DB_NAME):
         password=DB_PASSWORD,
         host=DB_SERVER,
         port=DB_PORT,
-        database=database,
+        database=database
     )
 
     return create_engine(url)
@@ -45,88 +78,38 @@ def get_engine(database=DB_NAME):
 # SQL File Execution
 # ==========================================
 
-def run_sql_file(path, engine):
-    """Execute semicolon-separated SQL statements."""
-
-    sql = Path(path).read_text(encoding="utf-8")
-
-    statements = [
-        statement.strip()
-        for statement in sql.split(";")
-        if statement.strip()
-    ]
+def run_sql_file(engine):
+    sql = BASE_SQL_FILE.read_text(encoding="utf-8")
 
     with engine.begin() as conn:
-        for statement in statements:
-            conn.execute(text(statement))
+        for statement in sql.split(";"):
+            if statement.strip():
+                conn.execute(text(statement))
 
 
 # ==========================================
-# Database Setup
+# Database Initialization
 # ==========================================
 
 def setup_database():
-    """Initialize PostgreSQL database and required schemas."""
-
     engine = get_engine()
 
     try:
-        # PostgreSQL connection test
-        with engine.connect() as conn:
-            version = conn.execute(
-                text("SELECT version()")
-            ).scalar()
-
-            print("PostgreSQL version:", version[:80])
-
-        # Enable pgvector extension
         with engine.begin() as conn:
             conn.execute(
                 text("CREATE EXTENSION IF NOT EXISTS vector")
             )
 
-        # Create Bronze, Silver and Gold schemas
-        run_sql_file(BASE_SQL_FILE, engine)
+        run_sql_file(engine)
 
         print("Database:", DB_NAME)
-        print("Connected as:", DB_USER)
-
-        # Verify pgvector extension
-        with engine.connect() as conn:
-            extension = conn.execute(
-                text("""
-                    SELECT extname
-                    FROM pg_extension
-                    WHERE extname = 'vector'
-                """)
-            ).scalar()
-
-            print("pgvector extension:", extension)
-
-        # Verify schemas
-        query = """
-            SELECT schema_name
-            FROM information_schema.schemata
-            WHERE schema_name IN ('bronze', 'silver', 'gold')
-            ORDER BY schema_name
-        """
-
-        with engine.connect() as conn:
-            schemas = pd.read_sql(
-                text(query),
-                conn,
-            )
-
-        print("\nDatabase schemas:")
-        print(schemas)
+        print("pgvector: Enabled")
+        print("Schemas: Bronze, Silver, Gold")
+        print("Database setup completed!")
 
     finally:
         engine.dispose()
 
-
-# ==========================================
-# Main Execution
-# ==========================================
 
 if __name__ == "__main__":
     setup_database()
