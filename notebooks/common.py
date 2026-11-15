@@ -11,3 +11,7 @@ from dotenv import load_dotenv
 import requests
 import gzip
 from datetime import datetime, timezone
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+TMDB_API_TOKEN = os.getenv("TMDB_API_TOKEN")
