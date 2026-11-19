@@ -6,6 +6,7 @@ dependencies = [
     "dagster>=1.13.30",
     "dagster-dg-cli>=1.13.30",
     "dagster-webserver>=1.13.30",
+    "openai>=3.55.1",
 ]
 [tool.dg]
 directory_type = "project"
