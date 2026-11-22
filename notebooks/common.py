@@ -23,7 +23,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 def get_engine(database=DB_NAME):
     url = URL.create(
-        "postgresql+psycopg",
+        "postgresql+pg8000",
         username=DB_USER,
         password=DB_PASSWORD,
         host=DB_SERVER,
